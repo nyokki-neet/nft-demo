@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NFT スマートコントラクト デモ - Ethereum Sepolia</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/web3modal@1.9.12/dist/index.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <style>
         * {
@@ -232,28 +230,61 @@
             color: #90cdf4;
         }
         
-        .qr-modal {
+        /* QRコードモーダル用スタイル */
+        .modal {
             display: none;
             position: fixed;
-            top: 0;
+            z-index: 1000;
             left: 0;
+            top: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
+            background-color: rgba(0,0,0,0.8);
         }
         
-        .qr-content {
-            background: white;
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: white;
             padding: 30px;
             border-radius: 15px;
             text-align: center;
+            max-width: 400px;
+            position: relative;
         }
         
-        .qr-content canvas {
-            margin: 20px 0;
+        .close-btn {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+        
+        .close-btn:hover {
+            color: #000;
+        }
+        
+        #qrcode-container {
+            margin: 20px auto;
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .qr-instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
         }
         
         .loading {
@@ -287,6 +318,38 @@
         .demo-info li {
             margin: 5px 0;
         }
+
+        .manual-connect {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .copy-button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .copy-button:hover {
+            background: #3182ce;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -315,7 +378,7 @@
                 <div id="networkInfo" style="margin-top: 10px; color: #718096;"></div>
             </div>
             <button id="connectMetaMask">🦊 MetaMask接続（PC）</button>
-            <button id="connectWalletConnect">📱 WalletConnect（スマホ）</button>
+            <button id="showQRCode">📱 QRコード表示（スマホ接続用）</button>
             <div id="walletDetails" style="margin-top: 15px;"></div>
         </div>
 
@@ -323,7 +386,7 @@
         <div class="section">
             <h2>2️⃣ スマートコントラクト設定</h2>
             <p style="color: #718096; margin-bottom: 15px;">RemixIDEでデプロイ済みのコントラクトアドレスを入力</p>
-            <input type="text" id="contractAddress" placeholder="0x8c15fa7067eD4F81F9ad5439A8A8B27ae95335Ef">
+            <input type="text" id="contractAddress" placeholder="0x7028CB5a61bD7d8613E8E1AAB7B1FeaBCeCE7dc2">
             <button id="setContract">コントラクト接続</button>
             <div id="contractStatus" style="margin-top: 15px;"></div>
         </div>
@@ -364,13 +427,27 @@
             <div id="executionLog" class="log-container"></div>
             <button id="clearLog" style="margin-top: 10px;">ログクリア</button>
         </div>
+    </div>
 
-        <!-- QRコードモーダル -->
-        <div id="qrModal" class="qr-modal">
-            <div class="qr-content">
-                <h3>📱 スマホでスキャン</h3>
-                <div id="qrCode"></div>
-                <button id="closeQR">閉じる</button>
+    <!-- QRコードモーダル -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeModal">&times;</span>
+            <h2>📱 スマホで接続</h2>
+            <div id="qrcode-container"></div>
+            <div class="qr-instructions">
+                <p><strong>接続方法：</strong></p>
+                <ol style="text-align: left; margin: 10px 0;">
+                    <li>MetaMaskアプリを開く</li>
+                    <li>「設定」→「実験的機能」でWalletConnect有効化</li>
+                    <li>「ウォレット」画面でQRスキャンアイコンをタップ</li>
+                    <li>このQRコードをスキャン</li>
+                </ol>
+            </div>
+            <div class="manual-connect">
+                <p><strong>または手動で接続：</strong></p>
+                <textarea id="wcUri" rows="3" readonly>接続URIを生成中...</textarea>
+                <button class="copy-button" onclick="copyWCUri()">URIをコピー</button>
             </div>
         </div>
     </div>
@@ -393,57 +470,91 @@
         let signer = null;
         let contract = null;
         let walletAddress = null;
-        let web3Modal = null;
 
         // 初期化
         window.addEventListener('load', () => {
-            initWeb3Modal();
             setupEventListeners();
             addLog('ページ読み込み完了', 'info');
         });
 
-        // Web3Modal初期化
-        function initWeb3Modal() {
-            const Web3Modal = window.Web3Modal.default;
-            const WalletConnectProvider = window.WalletConnectProvider.default;
-
-            const providerOptions = {
-                walletconnect: {
-                    package: WalletConnectProvider,
-                    options: {
-                        infuraId: "9aa3d95b3bc440fa88ea12eaa4456161",
-                        rpc: {
-                            11155111: "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
-                        }
-                    }
-                }
-            };
-
-            web3Modal = new Web3Modal({
-                network: "sepolia",
-                cacheProvider: false,
-                providerOptions,
-                theme: {
-                    background: "rgb(39, 49, 56)",
-                    main: "rgb(199, 199, 199)",
-                    secondary: "rgb(136, 136, 136)",
-                    border: "rgba(195, 195, 195, 0.14)",
-                    hover: "rgb(16, 26, 32)"
-                }
-            });
-        }
-
         // イベントリスナー設定
         function setupEventListeners() {
             document.getElementById('connectMetaMask').addEventListener('click', connectMetaMask);
-            document.getElementById('connectWalletConnect').addEventListener('click', connectWalletConnect);
+            document.getElementById('showQRCode').addEventListener('click', showQRCodeModal);
             document.getElementById('setContract').addEventListener('click', setContract);
             document.getElementById('mintNFT').addEventListener('click', mintNFT);
             document.getElementById('transferNFT').addEventListener('click', transferNFT);
             document.getElementById('refreshNFTs').addEventListener('click', loadOwnedNFTs);
             document.getElementById('clearLog').addEventListener('click', clearLog);
-            document.getElementById('closeQR').addEventListener('click', closeQRModal);
+            document.getElementById('closeModal').addEventListener('click', closeQRModal);
             document.getElementById('imageUpload').addEventListener('change', handleImageUpload);
+            
+            // モーダル外クリックで閉じる
+            window.onclick = function(event) {
+                const modal = document.getElementById('qrModal');
+                if (event.target == modal) {
+                    closeQRModal();
+                }
+            }
+        }
+
+        // QRコード表示
+        function showQRCodeModal() {
+            addLog('QRコード生成中...', 'info');
+            
+            // WalletConnect URIを生成（デモ用）
+            const wcUri = generateWalletConnectURI();
+            
+            // QRコードを生成
+            const qrContainer = document.getElementById('qrcode-container');
+            qrContainer.innerHTML = ''; // クリア
+            
+            // QRCode.jsを使用してQRコード生成
+            QRCode.toCanvas(wcUri, {
+                width: 256,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function (error, canvas) {
+                if (error) {
+                    console.error(error);
+                    addLog('QRコード生成エラー', 'error');
+                    return;
+                }
+                qrContainer.appendChild(canvas);
+            });
+            
+            // URIをテキストエリアに表示
+            document.getElementById('wcUri').value = wcUri;
+            
+            // モーダル表示
+            document.getElementById('qrModal').classList.add('show');
+            addLog('QRコード表示完了', 'success');
+        }
+
+        // WalletConnect URI生成（デモ用）
+        function generateWalletConnectURI() {
+            // 実際のWalletConnect実装では動的に生成されますが、
+            // デモ用に固定URIを使用
+            const bridge = "https://bridge.walletconnect.org";
+            const key = Math.random().toString(36).substring(7);
+            return `wc:${key}@1?bridge=${encodeURIComponent(bridge)}&key=${key}`;
+        }
+
+        // URIコピー機能
+        function copyWCUri() {
+            const textarea = document.getElementById('wcUri');
+            textarea.select();
+            document.execCommand('copy');
+            alert('URIをコピーしました');
+            addLog('URIコピー完了', 'info');
+        }
+
+        // QRモーダルを閉じる
+        function closeQRModal() {
+            document.getElementById('qrModal').classList.remove('show');
         }
 
         // ログ管理
@@ -484,22 +595,6 @@
             }
         }
 
-        // WalletConnect接続
-        async function connectWalletConnect() {
-            try {
-                addLog('WalletConnect接続開始...', 'info');
-                
-                const instance = await web3Modal.connectTo("walletconnect");
-                provider = new ethers.providers.Web3Provider(instance);
-                
-                await setupWallet();
-                
-            } catch (error) {
-                addLog(`WalletConnect接続エラー: ${error.message}`, 'error');
-                alert('WalletConnect接続に失敗しました');
-            }
-        }
-
         // ウォレット設定
         async function setupWallet() {
             try {
@@ -509,11 +604,10 @@
                     alert('Sepoliaテストネットに切り替えてください');
                     addLog('ネットワークエラー: Sepolia以外のネットワーク', 'error');
                     
-                    // ネットワーク切り替えリクエスト
                     try {
                         await window.ethereum.request({
                             method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: '0xaa36a7' }], // Sepolia
+                            params: [{ chainId: '0xaa36a7' }],
                         });
                     } catch (switchError) {
                         console.error(switchError);
@@ -524,7 +618,6 @@
                 signer = provider.getSigner();
                 walletAddress = await signer.getAddress();
                 
-                // UI更新
                 document.getElementById('walletStatus').innerHTML = 
                     `<span class="status-connected">✅ 接続済み: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}</span>`;
                 
@@ -539,7 +632,6 @@
                 
                 addLog(`ウォレット接続成功: ${walletAddress}`, 'success');
                 
-                // NFTリスト更新
                 if (contract) {
                     await loadOwnedNFTs();
                 }
@@ -574,7 +666,6 @@
                 
                 contract = new ethers.Contract(address, CONTRACT_ABI, signer);
                 
-                // 接続テスト（何かメソッドを呼んでみる）
                 const testBalance = await contract.balanceOf(walletAddress);
                 
                 document.getElementById('contractStatus').innerHTML = 
@@ -583,13 +674,11 @@
                         アドレス: ${address}
                     </div>`;
                 
-                // ボタン有効化
                 document.getElementById('mintNFT').disabled = false;
                 document.getElementById('transferNFT').disabled = false;
                 
                 addLog(`コントラクト接続完了`, 'success');
                 
-                // NFTリスト読み込み
                 await loadOwnedNFTs();
                 
             } catch (error) {
@@ -650,7 +739,6 @@
                     
                     const receipt = await tx.wait();
                     
-                    // イベントからTokenID取得
                     const event = receipt.events?.find(e => e.event === 'NFTMinted');
                     const tokenId = event?.args?.tokenId?.toString();
                     
@@ -665,10 +753,8 @@
                     
                     addLog(`NFT発行完了 (Token ID: ${tokenId})`, 'success');
                     
-                    // リスト更新
                     await loadOwnedNFTs();
                     
-                    // 入力クリア
                     fileInput.value = '';
                     document.getElementById('imagePreview').innerHTML = '';
                 };
@@ -729,10 +815,8 @@
                 
                 addLog(`NFT移転完了`, 'success');
                 
-                // リスト更新
                 await loadOwnedNFTs();
                 
-                // 入力クリア
                 document.getElementById('tokenId').value = '';
                 document.getElementById('recipientAddress').value = '';
                 
@@ -788,11 +872,6 @@
                     `<div class="alert alert-error">読み込みエラー: ${error.message}</div>`;
                 addLog(`NFTリスト取得エラー: ${error.message}`, 'error');
             }
-        }
-
-        // QRモーダル
-        function closeQRModal() {
-            document.getElementById('qrModal').style.display = 'none';
         }
     </script>
 </body>
