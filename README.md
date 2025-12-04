@@ -4,7 +4,7 @@
 イーサリアムのスマートコントラクトを使用したNFT発行・移転のデモンストレーションです。
 
 ## デモサイト
-🌐 **[https://nyokki-neet.github.io/nft-demo/](https://[your-username].github.io/nft-demo/)**
+🌐 **[https://nyokki-neet.github.io/nft-demo/]((https://nyokki-neet.github.io/nft-demo/))**
 
 ## 使用技術
 - **ブロックチェーン**: Ethereum Sepolia Testnet
