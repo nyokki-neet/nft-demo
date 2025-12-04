@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT スマートコントラクト デモ - Ethereum Sepolia</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3modal@1.9.12/dist/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 1.1em;
+        }
+        
+        .section {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 4px solid #667eea;
+        }
+        
+        h2 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+        
+        h3 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .status-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 15px;
+        }
+        
+        .status-connected {
+            color: #48bb78;
+            font-weight: bold;
+        }
+        
+        .status-disconnected {
+            color: #f56565;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 5px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        input[type="file"] {
+            margin: 15px 0;
+            padding: 10px;
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        .preview-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .preview {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .nft-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .nft-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .nft-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        
+        .nft-card img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .nft-id {
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+        }
+        
+        .alert {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left: 4px solid #48bb78;
+        }
+        
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border-left: 4px solid #f56565;
+        }
+        
+        .alert-info {
+            background: #bee3f8;
+            color: #2c5282;
+            border-left: 4px solid #4299e1;
+        }
+        
+        .log-container {
+            background: #1a202c;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 3px 0;
+            border-bottom: 1px solid #2d3748;
+        }
+        
+        .log-error {
+            color: #fc8181;
+        }
+        
+        .log-success {
+            color: #68d391;
+        }
+        
+        .log-info {
+            color: #90cdf4;
+        }
+        
+        .qr-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .qr-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        
+        .qr-content canvas {
+            margin: 20px 0;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .demo-info {
+            background: #edf2f7;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .demo-info ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .demo-info li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 NFT スマートコントラクト デモ</h1>
+            <p class="subtitle">Ethereum Sepolia テストネット実証実験</p>
+        </div>
+
+        <div class="demo-info">
+            <h3>📌 デモの概要</h3>
+            <ul>
+                <li>ブロックチェーン上でNFT（デジタル資産の所有権）を発行・管理</li>
+                <li>スマートコントラクトにより自動実行される処理を体験</li>
+                <li>トランザクションの透明性と改ざん不可能性を確認</li>
+            </ul>
+        </div>
+
+        <!-- ウォレット接続セクション -->
+        <div class="section">
+            <h2>1️⃣ ウォレット接続</h2>
+            <div class="status-box">
+                <div id="walletStatus" class="status-disconnected">
+                    ❌ ウォレット未接続
+                </div>
+                <div id="networkInfo" style="margin-top: 10px; color: #718096;"></div>
+            </div>
+            <button id="connectMetaMask">🦊 MetaMask接続（PC）</button>
+            <button id="connectWalletConnect">📱 WalletConnect（スマホ）</button>
+            <div id="walletDetails" style="margin-top: 15px;"></div>
+        </div>
+
+        <!-- コントラクト設定セクション -->
+        <div class="section">
+            <h2>2️⃣ スマートコントラクト設定</h2>
+            <p style="color: #718096; margin-bottom: 15px;">RemixIDEでデプロイ済みのコントラクトアドレスを入力</p>
+            <input type="text" id="contractAddress" placeholder="0x... (コントラクトアドレス)">
+            <button id="setContract">コントラクト接続</button>
+            <div id="contractStatus" style="margin-top: 15px;"></div>
+        </div>
+
+        <!-- NFT発行セクション -->
+        <div class="section">
+            <h2>3️⃣ NFT発行（ミント）</h2>
+            <h3>仕様1: 画像をNFT化</h3>
+            <input type="file" id="imageUpload" accept="image/*">
+            <div id="imagePreview" class="preview-container"></div>
+            <button id="mintNFT" disabled>🎯 NFTを発行する</button>
+            <div id="mintResult"></div>
+        </div>
+
+        <!-- 所有NFT表示セクション -->
+        <div class="section">
+            <h2>4️⃣ 所有NFT一覧</h2>
+            <button id="refreshNFTs">🔄 リスト更新</button>
+            <div id="ownedNFTs">
+                <p style="color: #718096;">コントラクト接続後に表示されます</p>
+            </div>
+        </div>
+
+        <!-- NFT移転セクション -->
+        <div class="section">
+            <h2>5️⃣ NFT移転（トランスファー）</h2>
+            <h3>仕様2: 所有権の移転</h3>
+            <input type="number" id="tokenId" placeholder="移転するNFTのToken ID" min="0">
+            <input type="text" id="recipientAddress" placeholder="移転先ウォレットアドレス (0x...)">
+            <button id="transferNFT" disabled>➡️ NFTを移転する</button>
+            <div id="transferResult"></div>
+        </div>
+
+        <!-- 実行ログセクション -->
+        <div class="section">
+            <h2>📜 実行ログ</h2>
+            <p style="color: #718096; margin-bottom: 10px;">トランザクション処理の詳細</p>
+            <div id="executionLog" class="log-container"></div>
+            <button id="clearLog" style="margin-top: 10px;">ログクリア</button>
+        </div>
+
+        <!-- QRコードモーダル -->
+        <div id="qrModal" class="qr-modal">
+            <div class="qr-content">
+                <h3>📱 スマホでスキャン</h3>
+                <div id="qrCode"></div>
+                <button id="closeQR">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // コントラクトABI定義
+        const CONTRACT_ABI = [
+            "function mintNFT(address to, string memory imageURI) public returns (uint256)",
+            "function transferNFT(address to, uint256 tokenId) public",
+            "function tokenURI(uint256 tokenId) public view returns (string memory)",
+            "function ownerOf(uint256 tokenId) public view returns (address)",
+            "function balanceOf(address owner) public view returns (uint256)",
+            "function getOwnedTokens(address owner) public view returns (uint256[] memory)",
+            "event NFTMinted(address indexed to, uint256 tokenId, string imageURI)",
+            "event NFTTransferred(address indexed from, address indexed to, uint256 tokenId)"
+        ];
+
+        // グローバル変数
+        let provider = null;
+        let signer = null;
+        let contract = null;
+        let walletAddress = null;
+        let web3Modal = null;
+
+        // 初期化
+        window.addEventListener('load', () => {
+            initWeb3Modal();
+            setupEventListeners();
+            addLog('ページ読み込み完了', 'info');
+        });
+
+        // Web3Modal初期化
+        function initWeb3Modal() {
+            const Web3Modal = window.Web3Modal.default;
+            const WalletConnectProvider = window.WalletConnectProvider.default;
+
+            const providerOptions = {
+                walletconnect: {
+                    package: WalletConnectProvider,
+                    options: {
+                        infuraId: "9aa3d95b3bc440fa88ea12eaa4456161",
+                        rpc: {
+                            11155111: "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+                        }
+                    }
+                }
+            };
+
+            web3Modal = new Web3Modal({
+                network: "sepolia",
+                cacheProvider: false,
+                providerOptions,
+                theme: {
+                    background: "rgb(39, 49, 56)",
+                    main: "rgb(199, 199, 199)",
+                    secondary: "rgb(136, 136, 136)",
+                    border: "rgba(195, 195, 195, 0.14)",
+                    hover: "rgb(16, 26, 32)"
+                }
+            });
+        }
+
+        // イベントリスナー設定
+        function setupEventListeners() {
+            document.getElementById('connectMetaMask').addEventListener('click', connectMetaMask);
+            document.getElementById('connectWalletConnect').addEventListener('click', connectWalletConnect);
+            document.getElementById('setContract').addEventListener('click', setContract);
+            document.getElementById('mintNFT').addEventListener('click', mintNFT);
+            document.getElementById('transferNFT').addEventListener('click', transferNFT);
+            document.getElementById('refreshNFTs').addEventListener('click', loadOwnedNFTs);
+            document.getElementById('clearLog').addEventListener('click', clearLog);
+            document.getElementById('closeQR').addEventListener('click', closeQRModal);
+            document.getElementById('imageUpload').addEventListener('change', handleImageUpload);
+        }
+
+        // ログ管理
+        function addLog(message, type = 'info') {
+            const logDiv = document.getElementById('executionLog');
+            const timestamp = new Date().toLocaleTimeString('ja-JP');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('executionLog').innerHTML = '';
+            addLog('ログクリア', 'info');
+        }
+
+        // MetaMask接続
+        async function connectMetaMask() {
+            try {
+                addLog('MetaMask接続開始...', 'info');
+                
+                if (!window.ethereum) {
+                    alert('MetaMaskがインストールされていません');
+                    addLog('MetaMask未検出', 'error');
+                    return;
+                }
+
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                
+                await setupWallet();
+                
+            } catch (error) {
+                addLog(`MetaMask接続エラー: ${error.message}`, 'error');
+                alert('MetaMask接続に失敗しました');
+            }
+        }
+
+        // WalletConnect接続
+        async function connectWalletConnect() {
+            try {
+                addLog('WalletConnect接続開始...', 'info');
+                
+                const instance = await web3Modal.connectTo("walletconnect");
+                provider = new ethers.providers.Web3Provider(instance);
+                
+                await setupWallet();
+                
+            } catch (error) {
+                addLog(`WalletConnect接続エラー: ${error.message}`, 'error');
+                alert('WalletConnect接続に失敗しました');
+            }
+        }
+
+        // ウォレット設定
+        async function setupWallet() {
+            try {
+                const network = await provider.getNetwork();
+                
+                if (network.chainId !== 11155111) {
+                    alert('Sepoliaテストネットに切り替えてください');
+                    addLog('ネットワークエラー: Sepolia以外のネットワーク', 'error');
+                    
+                    // ネットワーク切り替えリクエスト
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0xaa36a7' }], // Sepolia
+                        });
+                    } catch (switchError) {
+                        console.error(switchError);
+                    }
+                    return;
+                }
+
+                signer = provider.getSigner();
+                walletAddress = await signer.getAddress();
+                
+                // UI更新
+                document.getElementById('walletStatus').innerHTML = 
+                    `<span class="status-connected">✅ 接続済み: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}</span>`;
+                
+                document.getElementById('networkInfo').textContent = 
+                    `ネットワーク: Sepolia (Chain ID: ${network.chainId})`;
+                
+                const balance = await provider.getBalance(walletAddress);
+                document.getElementById('walletDetails').innerHTML = 
+                    `<div class="alert alert-info">
+                        残高: ${ethers.utils.formatEther(balance)} ETH
+                    </div>`;
+                
+                addLog(`ウォレット接続成功: ${walletAddress}`, 'success');
+                
+                // NFTリスト更新
+                if (contract) {
+                    await loadOwnedNFTs();
+                }
+                
+            } catch (error) {
+                addLog(`ウォレット設定エラー: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // コントラクト設定
+        async function setContract() {
+            const address = document.getElementById('contractAddress').value;
+            
+            if (!address) {
+                alert('コントラクトアドレスを入力してください');
+                return;
+            }
+            
+            if (!ethers.utils.isAddress(address)) {
+                alert('有効なアドレス形式ではありません');
+                return;
+            }
+            
+            if (!signer) {
+                alert('先にウォレットを接続してください');
+                return;
+            }
+            
+            try {
+                addLog(`コントラクト接続中: ${address}`, 'info');
+                
+                contract = new ethers.Contract(address, CONTRACT_ABI, signer);
+                
+                // 接続テスト（何かメソッドを呼んでみる）
+                const testBalance = await contract.balanceOf(walletAddress);
+                
+                document.getElementById('contractStatus').innerHTML = 
+                    `<div class="alert alert-success">
+                        ✅ コントラクト接続成功<br>
+                        アドレス: ${address}
+                    </div>`;
+                
+                // ボタン有効化
+                document.getElementById('mintNFT').disabled = false;
+                document.getElementById('transferNFT').disabled = false;
+                
+                addLog(`コントラクト接続完了`, 'success');
+                
+                // NFTリスト読み込み
+                await loadOwnedNFTs();
+                
+            } catch (error) {
+                document.getElementById('contractStatus').innerHTML = 
+                    `<div class="alert alert-error">接続エラー: ${error.message}</div>`;
+                addLog(`コントラクト接続エラー: ${error.message}`, 'error');
+            }
+        }
+
+        // 画像アップロード処理
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('imagePreview').innerHTML = 
+                        `<img src="${e.target.result}" class="preview">
+                         <p style="margin-top: 10px; color: #718096;">ファイル: ${file.name}</p>`;
+                };
+                reader.readAsDataURL(file);
+                addLog(`画像選択: ${file.name}`, 'info');
+            }
+        }
+
+        // NFT発行
+        async function mintNFT() {
+            const fileInput = document.getElementById('imageUpload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('画像を選択してください');
+                return;
+            }
+            
+            try {
+                addLog('NFT発行処理開始', 'info');
+                
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const imageData = e.target.result;
+                    
+                    document.getElementById('mintResult').innerHTML = 
+                        `<div class="alert alert-info">
+                            トランザクション送信中... <span class="loading"></span>
+                        </div>`;
+                    
+                    addLog('トランザクション送信中...', 'info');
+                    
+                    const tx = await contract.mintNFT(walletAddress, imageData);
+                    
+                    addLog(`TXハッシュ: ${tx.hash}`, 'info');
+                    
+                    document.getElementById('mintResult').innerHTML = 
+                        `<div class="alert alert-info">
+                            マイニング中... <span class="loading"></span><br>
+                            <small>TX: ${tx.hash.slice(0, 10)}...</small>
+                        </div>`;
+                    
+                    const receipt = await tx.wait();
+                    
+                    // イベントからTokenID取得
+                    const event = receipt.events?.find(e => e.event === 'NFTMinted');
+                    const tokenId = event?.args?.tokenId?.toString();
+                    
+                    document.getElementById('mintResult').innerHTML = 
+                        `<div class="alert alert-success">
+                            ✅ NFT発行成功！<br>
+                            Token ID: ${tokenId}<br>
+                            <a href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank">
+                                Etherscanで確認 →
+                            </a>
+                        </div>`;
+                    
+                    addLog(`NFT発行完了 (Token ID: ${tokenId})`, 'success');
+                    
+                    // リスト更新
+                    await loadOwnedNFTs();
+                    
+                    // 入力クリア
+                    fileInput.value = '';
+                    document.getElementById('imagePreview').innerHTML = '';
+                };
+                reader.readAsDataURL(file);
+                
+            } catch (error) {
+                document.getElementById('mintResult').innerHTML = 
+                    `<div class="alert alert-error">
+                        ❌ エラー: ${error.message}
+                    </div>`;
+                addLog(`NFT発行エラー: ${error.message}`, 'error');
+            }
+        }
+
+        // NFT移転
+        async function transferNFT() {
+            const tokenId = document.getElementById('tokenId').value;
+            const recipient = document.getElementById('recipientAddress').value;
+            
+            if (!tokenId || !recipient) {
+                alert('Token IDと移転先アドレスを入力してください');
+                return;
+            }
+            
+            if (!ethers.utils.isAddress(recipient)) {
+                alert('有効なアドレス形式ではありません');
+                return;
+            }
+            
+            try {
+                addLog(`NFT移転開始: Token ${tokenId} → ${recipient}`, 'info');
+                
+                document.getElementById('transferResult').innerHTML = 
+                    `<div class="alert alert-info">
+                        トランザクション送信中... <span class="loading"></span>
+                    </div>`;
+                
+                const tx = await contract.transferNFT(recipient, tokenId);
+                
+                addLog(`TXハッシュ: ${tx.hash}`, 'info');
+                
+                document.getElementById('transferResult').innerHTML = 
+                    `<div class="alert alert-info">
+                        マイニング中... <span class="loading"></span><br>
+                        <small>TX: ${tx.hash.slice(0, 10)}...</small>
+                    </div>`;
+                
+                await tx.wait();
+                
+                document.getElementById('transferResult').innerHTML = 
+                    `<div class="alert alert-success">
+                        ✅ NFT移転成功！<br>
+                        Token ID ${tokenId} → ${recipient.slice(0, 6)}...${recipient.slice(-4)}<br>
+                        <a href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank">
+                            Etherscanで確認 →
+                        </a>
+                    </div>`;
+                
+                addLog(`NFT移転完了`, 'success');
+                
+                // リスト更新
+                await loadOwnedNFTs();
+                
+                // 入力クリア
+                document.getElementById('tokenId').value = '';
+                document.getElementById('recipientAddress').value = '';
+                
+            } catch (error) {
+                document.getElementById('transferResult').innerHTML = 
+                    `<div class="alert alert-error">
+                        ❌ エラー: ${error.message}
+                    </div>`;
+                addLog(`NFT移転エラー: ${error.message}`, 'error');
+            }
+        }
+
+        // 所有NFT一覧取得
+        async function loadOwnedNFTs() {
+            if (!contract || !walletAddress) {
+                document.getElementById('ownedNFTs').innerHTML = 
+                    '<p style="color: #718096;">ウォレットとコントラクトを接続してください</p>';
+                return;
+            }
+            
+            try {
+                addLog('NFTリスト取得中...', 'info');
+                
+                const tokenIds = await contract.getOwnedTokens(walletAddress);
+                
+                const nftDiv = document.getElementById('ownedNFTs');
+                
+                if (tokenIds.length === 0) {
+                    nftDiv.innerHTML = '<p style="color: #718096;">所有しているNFTはありません</p>';
+                    addLog('所有NFT: 0個', 'info');
+                } else {
+                    let html = `<p style="margin-bottom: 15px;">所有NFT数: ${tokenIds.length}個</p>`;
+                    html += '<div class="nft-grid">';
+                    
+                    for (const tokenId of tokenIds) {
+                        const uri = await contract.tokenURI(tokenId);
+                        html += `
+                            <div class="nft-card">
+                                <img src="${uri}" alt="NFT ${tokenId}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHRleHQtYW5jaG9yPSJtaWRkbGUiIHg9IjEwMCIgeT0iNzUiIHN0eWxlPSJmaWxsOiNhYWE7Zm9udC13ZWlnaHQ6Ym9sZDtmb250LXNpemU6MTJweDtmb250LWZhbWlseTpBcmlhbCxIZWx2ZXRpY2Esc2Fucy1zZXJpZjtkb21pbmFudC1iYXNlbGluZTpjZW50cmFsIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4='">
+                                <div class="nft-id">Token ID: ${tokenId.toString()}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    html += '</div>';
+                    nftDiv.innerHTML = html;
+                    
+                    addLog(`所有NFT: ${tokenIds.length}個読み込み完了`, 'success');
+                }
+                
+            } catch (error) {
+                document.getElementById('ownedNFTs').innerHTML = 
+                    `<div class="alert alert-error">読み込みエラー: ${error.message}</div>`;
+                addLog(`NFTリスト取得エラー: ${error.message}`, 'error');
+            }
+        }
+
+        // QRモーダル
+        function closeQRModal() {
+            document.getElementById('qrModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
